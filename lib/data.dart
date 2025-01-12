@@ -1,8 +1,7 @@
 import 'package:chatview/chatview.dart';
 
 class Data {
-  static const profileImage =
-      "https://i.ytimg.com/vi/6L7wiCqaytg/maxresdefault.jpg";
+  static const profileImage = "https://i.ytimg.com/vi/6L7wiCqaytg/maxresdefault.jpg";
   static final messageList = [
     Message(
       id: '1',
