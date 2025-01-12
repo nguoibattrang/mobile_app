@@ -1,7 +1,9 @@
 import 'package:chatview/chatview.dart';
 import 'package:flutter/material.dart';
 import 'package:vcs_hackathon/data.dart';
+import 'package:vcs_hackathon/models/response_message.dart';
 import 'package:vcs_hackathon/models/theme.dart';
+import 'package:vcs_hackathon/service/api_service.dart';
 
 void main() {
   runApp(const Example());
@@ -34,9 +36,11 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   AppTheme theme = LightTheme();
+  ApiService apiService = ApiService();
   bool isDarkTheme = false;
   final _chatController = ChatController(
     initialMessageList: Data.messageList,
+    // initialMessageList: [],
     scrollController: ScrollController(),
     currentUser: ChatUser(
       id: '1',
@@ -57,27 +61,6 @@ class _ChatScreenState extends State<ChatScreen> {
     ],
   );
 
-  void _showHideTypingIndicator() {
-    _chatController.setTypingIndicator = !_chatController.showTypingIndicator;
-  }
-
-  void receiveMessage() async {
-    _chatController.addMessage(
-      Message(
-        id: DateTime.now().toString(),
-        message: 'I will schedule the meeting.',
-        createdAt: DateTime.now(),
-        sentBy: '2',
-      ),
-    );
-    await Future.delayed(const Duration(milliseconds: 500));
-    _chatController.addReplySuggestions([
-      const SuggestionItemData(text: 'Thanks.'),
-      const SuggestionItemData(text: 'Thank you very much.'),
-      const SuggestionItemData(text: 'Great.')
-    ]);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,9 +68,11 @@ class _ChatScreenState extends State<ChatScreen> {
         chatController: _chatController,
         onSendTap: _onSendTap,
         featureActiveConfig: const FeatureActiveConfig(
+          enableSwipeToReply: false,
           lastSeenAgoBuilderVisibility: true,
           receiptsBuilderVisibility: true,
           enableScrollToBottomButton: true,
+          enableReplySnackBar: false,
         ),
         scrollToBottomButtonConfig: ScrollToBottomButtonConfig(
           backgroundColor: theme.textFieldBackgroundColor,
@@ -166,14 +151,9 @@ class _ChatScreenState extends State<ChatScreen> {
           backgroundColor: theme.backgroundColor,
         ),
         sendMessageConfig: SendMessageConfiguration(
-          imagePickerIconsConfig: ImagePickerIconsConfiguration(
-            cameraIconColor: theme.cameraIconColor,
-            galleryIconColor: theme.galleryIconColor,
-          ),
-          replyMessageColor: theme.replyMessageColor,
+          enableCameraImagePicker: false,
+          enableGalleryImagePicker: false,
           defaultSendButtonColor: theme.sendButtonColor,
-          replyDialogColor: theme.replyDialogColor,
-          replyTitleColor: theme.replyTitleColor,
           textFieldBackgroundColor: theme.textFieldBackgroundColor,
           closeIconColor: theme.closeIconColor,
           textFieldConfig: TextFieldConfiguration(
@@ -183,16 +163,6 @@ class _ChatScreenState extends State<ChatScreen> {
             },
             compositionThresholdTime: const Duration(seconds: 1),
             textStyle: TextStyle(color: theme.textFieldTextColor),
-          ),
-          micIconColor: theme.replyMicIconColor,
-          voiceRecordingConfiguration: VoiceRecordingConfiguration(
-            backgroundColor: theme.waveformBackgroundColor,
-            recorderIconColor: theme.recordIconColor,
-            waveStyle: WaveStyle(
-              showMiddleLine: false,
-              waveColor: theme.waveColor ?? Colors.white,
-              extendWaveform: true,
-            ),
           ),
         ),
         chatBubbleConfig: ChatBubbleConfiguration(
@@ -218,18 +188,12 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             textStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
             onMessageRead: (message) {
-              /// send your message reciepts to the other client
               debugPrint('Message Read');
             },
             senderNameTextStyle:
             TextStyle(color: theme.inComingChatBubbleTextColor),
             color: theme.inComingChatBubbleColor,
           ),
-        ),
-        replyPopupConfig: ReplyPopupConfiguration(
-          backgroundColor: theme.replyPopupColor,
-          buttonTextStyle: TextStyle(color: theme.replyPopupButtonColor),
-          topBorderColor: theme.replyPopupTopBorderColor,
         ),
         reactionPopupConfig: ReactionPopupConfiguration(
           shadow: BoxShadow(
@@ -288,53 +252,31 @@ class _ChatScreenState extends State<ChatScreen> {
             fontWeight: FontWeight.bold,
             letterSpacing: 0.25,
           ),
-          replyTitleTextStyle: TextStyle(color: theme.repliedTitleTextColor),
-        ),
-        swipeToReplyConfig: SwipeToReplyConfiguration(
-          replyIconColor: theme.swipeToReplyIconColor,
-        ),
-        replySuggestionsConfig: ReplySuggestionsConfig(
-          itemConfig: SuggestionItemConfig(
-            decoration: BoxDecoration(
-              color: theme.textFieldBackgroundColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: theme.outgoingChatBubbleColor ?? Colors.white,
-              ),
-            ),
-            textStyle: TextStyle(
-              color: isDarkTheme ? Colors.white : Colors.black,
-            ),
-          ),
-          onTap: (item) =>
-              _onSendTap(item.text, const ReplyMessage(), MessageType.text),
         ),
       ),
     );
   }
 
-  void _onSendTap(
-      String message,
-      ReplyMessage replyMessage,
-      MessageType messageType,
-      ) {
+  void _onSendTap(String message, ReplyMessage replyMessage, MessageType messageType,) async {
     _chatController.addMessage(
       Message(
         id: DateTime.now().toString(),
         createdAt: DateTime.now(),
         message: message,
         sentBy: _chatController.currentUser.id,
-        replyMessage: replyMessage,
         messageType: messageType,
       ),
     );
-    Future.delayed(const Duration(milliseconds: 300), () {
-      _chatController.initialMessageList.last.setStatus =
-          MessageStatus.undelivered;
-    });
-    Future.delayed(const Duration(seconds: 1), () {
-      _chatController.initialMessageList.last.setStatus = MessageStatus.read;
-    });
+
+    ResponseMessage? response = await apiService.sendMessage("1", message);
+
+    if (response != null) {
+      print('Message ID: ${response.messageId}');
+      print('Answer: ${response.answer}');
+      print('Usage Tokens: ${response.metadata?.usage?.totalTokens}');
+    } else {
+      print('Failed to get response.');
+    }
   }
 
   void _onThemeIconTap() {
@@ -347,5 +289,20 @@ class _ChatScreenState extends State<ChatScreen> {
         isDarkTheme = true;
       }
     });
+  }
+
+  void _showHideTypingIndicator() {
+    _chatController.setTypingIndicator = !_chatController.showTypingIndicator;
+  }
+
+  void receiveMessage() async {
+    _chatController.addMessage(
+      Message(
+        id: DateTime.now().toString(),
+        message: 'I will schedule the meeting.',
+        createdAt: DateTime.now(),
+        sentBy: '2',
+      ),
+    );
   }
 }

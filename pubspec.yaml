@@ -36,6 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   chatview: ^2.4.0
 
+dependency_overrides:
+  http: ^1.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
