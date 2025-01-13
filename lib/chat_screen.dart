@@ -1,7 +1,7 @@
 import 'package:chatview/chatview.dart';
 import 'package:flutter/material.dart';
-import 'package:vcs_hackathon/data.dart';
-import 'package:vcs_hackathon/models/theme.dart';
+import 'package:vcs_hackathon/data/data.dart';
+import 'package:vcs_hackathon/data/theme.dart';
 import 'package:vcs_hackathon/service/api_service.dart';
 import 'package:vcs_hackathon/service/database_helper.dart';
 
@@ -21,56 +21,40 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   bool isDarkTheme = false;
-  bool isLoading = true;
   AppTheme theme = LightTheme();
   ApiService apiService = ApiService();
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  late ChatController _chatController;
+  final ChatController _chatController = ChatController(
+    initialMessageList: [],
+    scrollController: ScrollController(),
+    currentUser: ChatUser(
+      id: Data.userID,
+      name: Data.userName,
+    ),
+    otherUsers: [
+      ChatUser(
+        id: Data.chatbotID,
+        name: Data.chatbotName,
+        profilePhoto: Data.chatbotProfileImage,
+      ),
+    ],
+  );
 
   @override
   void initState() {
     super.initState();
-    _initializeChatController();
+    loadMessage();
   }
 
-  Future<void> _initializeChatController() async {
-    final result = await Future.wait([
-      _dbHelper.getMessagesByConversation(widget.conversationId),
-      Future.delayed(Duration(milliseconds: 500))
-    ]);
-
-    _chatController = ChatController(
-      initialMessageList: result[0],
-      scrollController: ScrollController(),
-      currentUser: ChatUser(
-        id: '1',
-        name: 'tuandd1',
-        profilePhoto: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQppeHrQNiD_G1H_z8DrfudEReo1gdoka42Yw&s',
-      ),
-      otherUsers: [
-        ChatUser(
-          id: '2',
-          name: 'Người Bát Tràng',
-          profilePhoto: Data.profileImage,
-        ),
-      ],
-    );
-
-    setState(() {
-      isLoading = false;
-    });
+  Future<void> loadMessage() async {
+    final result = await _dbHelper.getMessagesByConversation(widget.conversationId);
+    for (Message msg in result) {
+      _chatController.addMessage(msg);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
     return Scaffold(
       body: ChatView(
         chatController: _chatController,
@@ -108,7 +92,7 @@ class _ChatScreenState extends State<ChatScreen> {
         appBar: ChatViewAppBar(
           elevation: theme.elevation,
           backGroundColor: theme.appBarColor,
-          profilePicture: Data.profileImage,
+          profilePicture: Data.chatbotProfileImage,
           backArrowColor: theme.backArrowColor,
           chatTitle: widget.conversationName,
           chatTitleTextStyle: TextStyle(
@@ -126,22 +110,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 isDarkTheme
                     ? Icons.brightness_4_outlined
                     : Icons.dark_mode_outlined,
-                color: theme.themeIconColor,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Toggle TypingIndicator',
-              onPressed: _showHideTypingIndicator,
-              icon: Icon(
-                Icons.keyboard,
-                color: theme.themeIconColor,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Simulate Message receive',
-              onPressed: receiveMessage,
-              icon: Icon(
-                Icons.supervised_user_circle,
                 color: theme.themeIconColor,
               ),
             ),
@@ -165,9 +133,6 @@ class _ChatScreenState extends State<ChatScreen> {
           textFieldBackgroundColor: theme.textFieldBackgroundColor,
           closeIconColor: theme.closeIconColor,
           textFieldConfig: TextFieldConfiguration(
-            onMessageTyping: (status) {
-              debugPrint(status.toString());
-            },
             compositionThresholdTime: const Duration(seconds: 1),
             textStyle: TextStyle(color: theme.textFieldTextColor),
           ),
@@ -194,9 +159,6 @@ class _ChatScreenState extends State<ChatScreen> {
               titleStyle: theme.incomingChatLinkTitleStyle,
             ),
             textStyle: TextStyle(color: theme.inComingChatBubbleTextColor),
-            onMessageRead: (message) {
-              debugPrint('Message Read');
-            },
             senderNameTextStyle:
             TextStyle(color: theme.inComingChatBubbleTextColor),
             color: theme.inComingChatBubbleColor,
@@ -244,7 +206,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         profileCircleConfig: const ProfileCircleConfiguration(
-          profileImageUrl: Data.profileImage,
+          profileImageUrl: Data.chatbotProfileImage,
         ),
         repliedMessageConfig: RepliedMessageConfiguration(
           backgroundColor: theme.repliedMessageColor,
@@ -274,8 +236,15 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     _chatController.addMessage(newMessage);
+    _dbHelper.insertMessage(widget.conversationId, newMessage);
 
-    await _dbHelper.insertMessage(widget.conversationId, newMessage);
+    _showHideTypingIndicator();
+    Message? replyMessage = await ApiService().sendMessage(message);
+    if (replyMessage != null) {
+      _showHideTypingIndicator();
+      _chatController.addMessage(replyMessage);
+      _dbHelper.insertMessage(widget.conversationId, replyMessage);
+    }
   }
 
   void _onThemeIconTap() {
@@ -292,20 +261,5 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showHideTypingIndicator() {
     _chatController.setTypingIndicator = !_chatController.showTypingIndicator;
-  }
-
-  void receiveMessage() async {
-    _showHideTypingIndicator();
-    final newMessage = Message(
-      id: DateTime.now().toString(),
-      message: 'ok bro',
-      createdAt: DateTime.now(),
-      sentBy: '2',
-    );
-    await Future.delayed(Duration(milliseconds: 1000));
-    _showHideTypingIndicator();
-    _chatController.addMessage(newMessage);
-
-    await _dbHelper.insertMessage(widget.conversationId, newMessage);
   }
 }

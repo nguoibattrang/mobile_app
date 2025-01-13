@@ -36,9 +36,15 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         final TextEditingController controller = TextEditingController();
         return AlertDialog(
-          title: const Text('Nhập tên cuộc hội thoại'),
+          title: const Text('Tên cuộc hội thoại:'),
           content: TextField(
             controller: controller,
+            decoration: InputDecoration(
+              hintText: "Nhập tên cuộc hội thoại",
+              hintStyle: TextStyle(
+                color: Color(0xFFE6DBDB)
+              )
+            )
           ),
           actions: [
             TextButton(

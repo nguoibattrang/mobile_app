@@ -1,44 +1,45 @@
+import 'package:chatview/chatview.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
-import '../models/response_message.dart';
+import 'package:vcs_hackathon/data/data.dart';
+import '../env/env.dart';
 
 class ApiService {
-  Future<ResponseMessage?> sendMessage(String userId, String query) async {
+  static String conversationId = "";
+
+  Future<Message?> sendMessage(String query) async {
     try {
       final response = await http.post(
-        Uri.parse('http://37d4-113-23-6-4.ngrok-free.app/v1/chat-messages/'),
+        Uri.parse(Data.url),
         headers: <String, String>{
-          'Authorization': 'Bearer app-l355z3VNc8r9vA6DdqrSY1li',
+          'Authorization': 'Bearer ${Env.apiKey}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
           'inputs': {},
           'query': query,
           'response_mode': 'blocking',
-          'conversation_id': '',
-          'user': userId
+          'conversation_id': conversationId,
+          'user': Data.userID
         }),
       );
 
-
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
-        if (responseBody['data'] != null && responseBody['data'].isNotEmpty) {
-          return ResponseMessage.fromJson(responseBody['data'][0]);
-        } else {
-          print('Response data is empty.');
-          return null;
+        if (responseBody?.isNotEmpty) {
+          conversationId = responseBody['conversation_id'];
+          String message = responseBody['answer'];
+          DateTime createdTime = DateTime.now();
+          return Message(
+            id: createdTime.toString(),
+            message: message,
+            createdAt: createdTime,
+            sentBy: Data.chatbotID
+          );
         }
-      } else {
-        print('Failed to send message: ${response.body}');
-        print (response.statusCode);
-        print (response.headers);
-        print (response.body);
-        return null;
       }
+      return null;
     } catch (e) {
-      print('Error while sending message: $e');
       return null;
     }
   }
